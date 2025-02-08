@@ -1,8 +1,8 @@
 VERSION = 4
 PATCHLEVEL = 4
 SUBLEVEL = 1
-EXTRAVERSION =
-NAME = Blurry Fish Butt
+EXTRAVERSION = labMMCP
+NAME = Y
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
