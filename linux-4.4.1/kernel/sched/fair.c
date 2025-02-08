@@ -35,6 +35,8 @@
 
 #include "sched.h"
 
+int sysctl_sched_fs_enable = 0;
+int sysctl_sched_fs_profiler = 0;
 /*
  * Targeted preemption latency for CPU-bound tasks:
  * (default: 6ms * (1 + ilog(ncpus)), units: nanoseconds)
@@ -590,6 +592,26 @@ int sched_proc_update_handler(struct ctl_table *table, int write,
 }
 #endif
 
+int my_proc_profiler(struct ctl_table *table, int write,
+		void __user *buffer, size_t *lenp,
+		loff_t *ppos)
+{
+
+	int ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
+
+	struct task_struct *tg, *t;
+
+	if(!sysctl_sched_fs_profiler) {
+		for_each_process_thread(tg, t) {
+			if(task_uid(t).val > 1000 && t->profiler_time) {
+				pr_info("%u %d %llu\n",task_uid(t).val, t->tgid, t->profiler_time);
+				t->profiler_time = 0;
+			}
+		}
+	}
+	return ret;
+}
+
 /*
  * delta /= w
  */
@@ -719,7 +741,31 @@ static void update_curr(struct cfs_rq *cfs_rq)
 	curr->sum_exec_runtime += delta_exec;
 	schedstat_add(cfs_rq, exec_clock, delta_exec);
 
-	curr->vruntime += calc_delta_fair(delta_exec, curr);
+	if(sysctl_sched_fs_enable && entity_is_task(curr) && task_uid(task_of(curr)).val >= 1001) {
+		
+		struct task_struct *tg, *t, *curtask = task_of(curr);
+		unsigned int active_process = 0;
+		kuid_t userid = task_uid(curtask); 
+
+		if(sysctl_sched_fs_profiler) {
+			curtask->profiler_time += delta_exec;
+		}
+		
+		for_each_process_thread(tg,t){
+			if(uid_eq(userid, task_uid(t)) && t->state == 0) 
+				active_process++;
+		}
+
+		if(active_process == 0)
+			active_process = 1;
+
+		curr->vruntime += (calc_delta_fair(delta_exec, curr) * (u64)active_process);
+		
+	}
+	else {
+		curr->vruntime += calc_delta_fair(delta_exec, curr);
+	}	
+
 	update_min_vruntime(cfs_rq);
 
 	if (entity_is_task(curr)) {
