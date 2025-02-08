@@ -1404,6 +1404,8 @@ struct task_struct {
 #endif
 	struct sched_dl_entity dl;
 
+	u64 profiler_time;
+
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	/* list of struct preempt_notifier: */
 	struct hlist_head preempt_notifiers;
